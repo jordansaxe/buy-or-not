@@ -203,7 +203,7 @@ function Pill({
 }: {
   children: React.ReactNode;
   tone?: "gray" | "green" | "yellow" | "red" | "blue";
-} ) {
+}) {
   const tones: Record<string, string> = {
     gray: "bg-slate-100 text-slate-800",
     green: "bg-green-100 text-green-800",
@@ -212,7 +212,9 @@ function Pill({
     blue: "bg-blue-100 text-blue-800",
   };
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${tones[tone]}`}>
+    <span
+      className={`px-2 py-1 rounded-full text-xs font-medium ${tones[tone]}`}
+    >
       {children}
     </span>
   );
@@ -247,7 +249,8 @@ function BuyOrNot() {
   const [demandKey, setDemandKey] =
     useState<(typeof DEMAND_PRESETS)[number]["key"]>("medium");
   const cond = useMemo(
-    () => CONDITION_PRESETS.find((c) => c.key === condKey) ?? CONDITION_PRESETS[1],
+    () =>
+      CONDITION_PRESETS.find((c) => c.key === condKey) ?? CONDITION_PRESETS[1],
     [condKey]
   );
   const demand = useMemo(
@@ -279,7 +282,10 @@ function BuyOrNot() {
   const [wFinancial, setWFinancial] = useState(0.45);
   const [wUtility, setWUtility] = useState(0.4);
   const [wRisk, setWRisk] = useState(0.15);
-  const sumW = useMemo(() => wFinancial + wUtility + wRisk, [wFinancial, wUtility, wRisk]);
+  const sumW = useMemo(
+    () => wFinancial + wUtility + wRisk,
+    [wFinancial, wUtility, wRisk]
+  );
 
   // Persistence (localStorage)
   type Entry = {
@@ -316,7 +322,7 @@ function BuyOrNot() {
     subtitle: "A tiny tool for clearer purchase decisions",
   };
   useEffect(() => {
-    const base = "Buy-or-Not";
+    const base = brand.title;
     if (!itemName) {
       document.title = base;
       return;
@@ -356,7 +362,15 @@ function BuyOrNot() {
     const timeCost = adjTimeHours * hourlyValue;
     const offset = gross - platformFees - shipCost - timeCost - friction;
     return Math.max(0, offset);
-  }, [adjSaleProb, adjSalePrice, platformFees, shipCost, adjTimeHours, hourlyValue, friction]);
+  }, [
+    adjSaleProb,
+    adjSalePrice,
+    platformFees,
+    shipCost,
+    adjTimeHours,
+    hourlyValue,
+    friction,
+  ]);
 
   const effectiveCost = useMemo(
     () => Math.max(0, stickerCost - resaleOffset),
@@ -383,7 +397,11 @@ function BuyOrNot() {
       : 0;
     const cpuBonus = costPerUse < 1 ? 8 : costPerUse < 3 ? 5 : 0;
     const base =
-      0.43 * affordability + 0.32 * usage + 0.2 * priceDrag + resaleBonus + cpuBonus;
+      0.43 * affordability +
+      0.32 * usage +
+      0.2 * priceDrag +
+      resaleBonus +
+      cpuBonus;
     return clamp(base);
   }, [
     budgetImpact,
@@ -405,8 +423,18 @@ function BuyOrNot() {
     const aggressiveNudge = resaleAggressive
       ? Math.min(10, (resaleOffset / Math.max(1, stickerCost)) * 50)
       : 0;
-    return clamp(0.4 * need + 0.35 * freq + 0.25 * joy + work + aggressiveNudge);
-  }, [needLevel, joyScore, useFrequency, workRelated, resaleAggressive, resaleOffset, stickerCost]);
+    return clamp(
+      0.4 * need + 0.35 * freq + 0.25 * joy + work + aggressiveNudge
+    );
+  }, [
+    needLevel,
+    joyScore,
+    useFrequency,
+    workRelated,
+    resaleAggressive,
+    resaleOffset,
+    stickerCost,
+  ]);
 
   const riskScore = useMemo(() => {
     const returns = returnPolicy * 10;
@@ -416,9 +444,22 @@ function BuyOrNot() {
     const urg = urgency * 6;
     const clutterPenalty = keepOldItem ? minimalismStrength : 0;
     const base =
-      0.3 * returns + 0.25 * warr + 0.25 * space + 0.1 * alt + 0.1 * urg - clutterPenalty;
+      0.3 * returns +
+      0.25 * warr +
+      0.25 * space +
+      0.1 * alt +
+      0.1 * urg -
+      clutterPenalty;
     return clamp(base);
-  }, [returnPolicy, warranty, spaceFit, altAvailable, urgency, keepOldItem, minimalismStrength]);
+  }, [
+    returnPolicy,
+    warranty,
+    spaceFit,
+    altAvailable,
+    urgency,
+    keepOldItem,
+    minimalismStrength,
+  ]);
 
   const decisionScore = useMemo(() => {
     const weighted =
@@ -428,17 +469,29 @@ function BuyOrNot() {
 
   const verdict = useMemo(() => {
     if (decisionScore >= 80) return { label: "Buy", tone: "green" as const };
-    if (decisionScore >= 65) return { label: "Lean Buy (watch price)", tone: "blue" as const };
-    if (decisionScore >= 50) return { label: "Wait / Re-evaluate", tone: "yellow" as const };
+    if (decisionScore >= 65)
+      return { label: "Lean Buy (watch price)", tone: "blue" as const };
+    if (decisionScore >= 50)
+      return { label: "Wait / Re-evaluate", tone: "yellow" as const };
     return { label: "Skip for now", tone: "red" as const };
   }, [decisionScore]);
 
   // Sensitivity
   const bestOffset = Math.max(
     0,
-    adjSalePrice - platformFees - shipCost - adjTimeHours * hourlyValue - friction
+    adjSalePrice -
+      platformFees -
+      shipCost -
+      adjTimeHours * hourlyValue -
+      friction
   );
-  const scoreFor = ({ sticker, offset }: { sticker: number; offset: number }) => {
+  const scoreFor = ({
+    sticker,
+    offset,
+  }: {
+    sticker: number;
+    offset: number;
+  }) => {
     const eff = Math.max(0, sticker - offset);
     const affordability = clamp(100 - budgetImpact * 10);
     const usage = clamp(useFrequency * 8 + longevity * 4);
@@ -446,7 +499,9 @@ function BuyOrNot() {
     const resaleBonus = resaleAggressive
       ? clamp((offset / Math.max(1, sticker)) * 100) * 0.2
       : 0;
-    const fin = clamp(0.43 * affordability + 0.32 * usage + 0.2 * priceDrag + resaleBonus);
+    const fin = clamp(
+      0.43 * affordability + 0.32 * usage + 0.2 * priceDrag + resaleBonus
+    );
     const utilAgg = resaleAggressive
       ? Math.min(10, (offset / Math.max(1, sticker)) * 50)
       : 0;
@@ -470,11 +525,19 @@ function BuyOrNot() {
         ? scoreFor({ sticker: stickerCostWait, offset: resaleOffset })
         : null,
     }),
-    [decisionScore, stickerCost, stickerCostWait, resaleOffset, bestOffset, simulateWait]
+    [
+      decisionScore,
+      stickerCost,
+      stickerCostWait,
+      resaleOffset,
+      bestOffset,
+      simulateWait,
+    ]
   );
 
   const perUseBadge = useMemo(() => {
-    if (costPerUse < 1) return { tone: "green" as const, text: "stellar per-use" };
+    if (costPerUse < 1)
+      return { tone: "green" as const, text: "stellar per-use" };
     if (costPerUse < 3) return { tone: "blue" as const, text: "good per-use" };
     if (costPerUse < 7) return { tone: "yellow" as const, text: "ok per-use" };
     return { tone: "red" as const, text: "weak per-use" };
@@ -655,11 +718,9 @@ function BuyOrNot() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-transparent">
-            Buy-or-Not
+            {brand.title}
           </h1>
-          <p className="text-sm text-slate-500">
-            A tiny tool for clearer purchase decisions
-          </p>
+          <p className="text-sm text-slate-500">{brand.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <Pill tone={perUseBadge.tone}>{perUseBadge.text}</Pill>
@@ -686,7 +747,9 @@ function BuyOrNot() {
       <Section title="Item" subtitle="Fill in your basics">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="md:col-span-2">
-            <span className="text-sm font-medium text-slate-700">Item name</span>
+            <span className="text-sm font-medium text-slate-700">
+              Item name
+            </span>
             <input
               className="mt-1 w-full rounded-xl border-slate-200 focus:border-slate-400 focus:ring-0"
               value={itemName}
@@ -713,7 +776,8 @@ function BuyOrNot() {
           />
           <div className="flex items-end">
             <div className="text-sm text-slate-600">
-              Sticker (now): <span className="font-medium">{currency(stickerCost)}</span>
+              Sticker (now):{" "}
+              <span className="font-medium">{currency(stickerCost)}</span>
             </div>
           </div>
           <Toggle
@@ -742,7 +806,9 @@ function BuyOrNot() {
               />
               <div className="flex items-end text-sm text-slate-600">
                 Sticker if on sale:{" "}
-                <span className="font-medium ml-1">{currency(stickerCostWait)}</span>
+                <span className="font-medium ml-1">
+                  {currency(stickerCostWait)}
+                </span>
               </div>
             </div>
           )}
@@ -777,7 +843,10 @@ function BuyOrNot() {
                 value={condKey}
                 onChange={setCondKey}
                 options={
-                  CONDITION_PRESETS as unknown as { key: typeof condKey; label: string }[]
+                  CONDITION_PRESETS as unknown as {
+                    key: typeof condKey;
+                    label: string;
+                  }[]
                 }
                 hint="Adjusts expected price & probability"
               />
@@ -786,17 +855,23 @@ function BuyOrNot() {
                 value={demandKey}
                 onChange={setDemandKey}
                 options={
-                  DEMAND_PRESETS as unknown as { key: typeof demandKey; label: string }[]
+                  DEMAND_PRESETS as unknown as {
+                    key: typeof demandKey;
+                    label: string;
+                  }[]
                 }
                 hint="Adjusts probability & time"
               />
               <div className="bg-slate-50 rounded-xl p-3 text-sm flex flex-col justify-center">
                 <div>
-                  Adj probability: <span className="font-semibold">{pct(adjSaleProb)}</span>
+                  Adj probability:{" "}
+                  <span className="font-semibold">{pct(adjSaleProb)}</span>
                 </div>
                 <div>
                   Adj sale price:{" "}
-                  <span className="font-semibold">{currency(adjSalePrice)}</span>
+                  <span className="font-semibold">
+                    {currency(adjSalePrice)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -842,7 +917,8 @@ function BuyOrNot() {
             />
             <div className="bg-slate-50 rounded-xl p-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
-                Resale offset: <span className="font-semibold">{currency(resaleOffset)}</span>
+                Resale offset:{" "}
+                <span className="font-semibold">{currency(resaleOffset)}</span>
               </div>
               <div>
                 Effective cost after offset:{" "}
@@ -855,9 +931,21 @@ function BuyOrNot() {
         {/* Utility & Joy */}
         <Section title="Utility & Joy" subtitle="How much value do you get?">
           <div className="space-y-3">
-            <Slider label="Need level" value={needLevel} onChange={setNeedLevel} />
-            <Slider label="Use frequency" value={useFrequency} onChange={setUseFrequency} />
-            <Slider label="Joy/delight" value={joyScore} onChange={setJoyScore} />
+            <Slider
+              label="Need level"
+              value={needLevel}
+              onChange={setNeedLevel}
+            />
+            <Slider
+              label="Use frequency"
+              value={useFrequency}
+              onChange={setUseFrequency}
+            />
+            <Slider
+              label="Joy/delight"
+              value={joyScore}
+              onChange={setJoyScore}
+            />
             <Slider
               label="Longevity (subjective)"
               value={longevity}
@@ -881,8 +969,16 @@ function BuyOrNot() {
           subtitle="How safe/easy is this purchase?"
         >
           <div className="space-y-3">
-            <Slider label="Return policy" value={returnPolicy} onChange={setReturnPolicy} />
-            <Slider label="Warranty/support" value={warranty} onChange={setWarranty} />
+            <Slider
+              label="Return policy"
+              value={returnPolicy}
+              onChange={setReturnPolicy}
+            />
+            <Slider
+              label="Warranty/support"
+              value={warranty}
+              onChange={setWarranty}
+            />
             <Slider label="Space fit" value={spaceFit} onChange={setSpaceFit} />
             <Slider
               label="Good alternatives exist"
@@ -930,7 +1026,9 @@ function BuyOrNot() {
             <div>
               <div>
                 Financial sub-score:{" "}
-                <span className="font-semibold">{Math.round(financialScore)}</span>
+                <span className="font-semibold">
+                  {Math.round(financialScore)}
+                </span>
               </div>
               <div className="text-xs text-slate-500">
                 Uses effective cost, usage & budget pain.
@@ -938,7 +1036,8 @@ function BuyOrNot() {
             </div>
             <div className="text-right">
               <div>
-                Tax: <span className="font-medium">{currency(taxFor(price))}</span>
+                Tax:{" "}
+                <span className="font-medium">{currency(taxFor(price))}</span>
               </div>
               <div>
                 Effective cost:{" "}
@@ -972,7 +1071,10 @@ function BuyOrNot() {
       </Section>
 
       {/* Weights & Sensitivity */}
-      <Section title="Weights & Sensitivity" subtitle="Tune how much each pillar matters">
+      <Section
+        title="Weights & Sensitivity"
+        subtitle="Tune how much each pillar matters"
+      >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <LabeledNumber
             label="Weight: Financial"
@@ -1008,10 +1110,12 @@ function BuyOrNot() {
         </p>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
           <div className="bg-slate-50 rounded-xl p-3 text-sm">
-            Score now: <span className="font-semibold">{sensitivity.current}</span>
+            Score now:{" "}
+            <span className="font-semibold">{sensitivity.current}</span>
           </div>
           <div className="bg-slate-50 rounded-xl p-3 text-sm">
-            If no resale: <span className="font-semibold">{sensitivity.noResale}</span>
+            If no resale:{" "}
+            <span className="font-semibold">{sensitivity.noResale}</span>
           </div>
           <div className="bg-slate-50 rounded-xl p-3 text-sm">
             If best-case resale:{" "}
@@ -1027,7 +1131,10 @@ function BuyOrNot() {
       </Section>
 
       {/* History */}
-      <Section title="History" subtitle="Your saved purchase ideas (stored in this browser)">
+      <Section
+        title="History"
+        subtitle="Your saved purchase ideas (stored in this browser)"
+      >
         {entries.length === 0 ? (
           <p className="text-sm text-slate-500">
             No entries yet. Tune something above and hit{" "}
@@ -1045,8 +1152,8 @@ function BuyOrNot() {
                 <div className="flex-1">
                   <div className="text-sm font-medium">{e.name}</div>
                   <div className="text-xs text-slate-500">
-                    {new Date(e.createdAt).toLocaleString()} • {e.outputs.verdict} •{" "}
-                    {e.outputs.decisionScore}/100 • Eff:{" "}
+                    {new Date(e.createdAt).toLocaleString()} •{" "}
+                    {e.outputs.verdict} • {e.outputs.decisionScore}/100 • Eff:{" "}
                     {currency(e.outputs.effectiveCost)}
                   </div>
                 </div>
@@ -1063,7 +1170,10 @@ function BuyOrNot() {
                   >
                     Rename via Item
                   </button>
-                  <button className="btn-danger" onClick={() => deleteEntry(e.id)}>
+                  <button
+                    className="btn-danger"
+                    onClick={() => deleteEntry(e.id)}
+                  >
                     Delete
                   </button>
                 </div>
@@ -1077,9 +1187,9 @@ function BuyOrNot() {
       <Section title="Explain the Math" subtitle="Transparent formula sketch">
         <div className="text-sm space-y-2">
           <p>
-            <span className="font-medium">Effective Cost</span> = (Price + Tax) −
-            max(0, AdjSalePrice×AdjProb − Fees − Shipping − (AdjTimeHours×$∕hr) −
-            Friction)
+            <span className="font-medium">Effective Cost</span> = (Price + Tax)
+            − max(0, AdjSalePrice×AdjProb − Fees − Shipping −
+            (AdjTimeHours×$∕hr) − Friction)
           </p>
         </div>
       </Section>
@@ -1087,8 +1197,8 @@ function BuyOrNot() {
       {/* Footer */}
       <footer className="pt-2 text-xs text-slate-500 flex items-center justify-between">
         <div>
-          Made by <span className="font-medium">you</span>. Weights & formulas are editable
-          — trust your judgment.
+          Made by <span className="font-medium">you</span>. Weights & formulas
+          are editable — trust your judgment.
         </div>
         <a className="underline" href="#top">
           Back to top
