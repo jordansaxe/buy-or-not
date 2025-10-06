@@ -414,12 +414,12 @@ function DecisionSummary(props: {
               <ScoreBar label="Fewer alternatives" value={alternatives} />
               <ScoreBar label="Urgency" value={urg} />
             </div>
-            {props.keepOldItem && (
+            {keepOldItem && (
               <div className="mt-2">
-                <Chip>minimalism penalty −{props.minimalismStrength}</Chip>
+                <Chip>minimalism penalty −{minimalismStrength}</Chip>
               </div>
             )}
-            {props.resaleAggressive && (
+            {resaleAggressive && (
               <div className="mt-2">
                 <Chip>aggressive resale influence</Chip>
               </div>
