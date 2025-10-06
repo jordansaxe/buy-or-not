@@ -1,3 +1,32 @@
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html, body { height: 100%; }
+}
+
+@layer components {
+  /* Reusable surface */
+  .card {
+    @apply bg-white/80 backdrop-blur rounded-2xl border border-slate-200 shadow-soft;
+  }
+  /* Button styles */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition;
+  }
+  .btn-primary {
+    @apply btn bg-slate-900 text-white hover:bg-slate-800;
+  }
+  .btn-ghost {
+    @apply btn bg-white border border-slate-200 hover:border-slate-300;
+  }
+  .btn-danger {
+    @apply btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100;
+  }
+  /* Tiny label */
+  .eyebrow {
+    @apply uppercase tracking-wide text-[10px] font-semibold text-slate-500;
+  }
+}
