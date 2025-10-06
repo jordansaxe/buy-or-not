@@ -1,13 +1,11 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 /**
- * Buy-or-Not Calculator (React + TS + Tailwind)
- * Vibe: like should-i-buy-it, plus:
- *  - Sell-to-Offset (resale) w/ fees, shipping, time value, friction
- *  - Condition & Demand presets (affect resale price/probability/time)
- *  - Wait-for-Sale simulator (target discount & months delay)
- *  - Per-use math (months owned, uses/week)
- *  - Minimalism nudge (penalty if you keep the old item)
+ * Buy-or-Not Calculator (React + TS-friendly + Tailwind)
+ * — includes Sell-to-Offset, Condition & Demand presets, Wait-for-Sale sim,
+ *    Per-use math, Minimalism nudge, Branding polish, and Entry History (localStorage).
+ *
+ * Drop this into src/App.tsx in a React + Vite + Tailwind project.
  */
 
 // ---------- Helpers ----------
@@ -160,7 +158,7 @@ function Toggle({
   );
 }
 
-function Select({
+function Select<T extends string>({
   label,
   value,
   onChange,
@@ -168,9 +166,9 @@ function Select({
   hint,
 }: {
   label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { key: string; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  options: { key: T; label: string }[];
   hint?: string;
 }) {
   return (
@@ -182,7 +180,7 @@ function Select({
       <select
         className="mt-1 w-full rounded-xl border-gray-200 focus:border-gray-400 focus:ring-0 bg-white"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value as T)}
       >
         {options.map((o) => (
           <option key={o.key} value={o.key}>
@@ -222,12 +220,12 @@ function BuyOrNot() {
   // Core inputs
   const [itemName, setItemName] = useState("Example: Sony WH-1000XM5");
   const [price, setPrice] = useState(500);
-  const [taxRatePct, setTaxRatePct] = useState(13); // ON HST
-  const [budgetImpact, setBudgetImpact] = useState(5); // 0..10
-  const [needLevel, setNeedLevel] = useState(4); // 0..10
-  const [useFrequency, setUseFrequency] = useState(7); // 0..10
-  const [joyScore, setJoyScore] = useState(6); // 0..10
-  const [longevity, setLongevity] = useState(6); // 0..10
+  const [taxRatePct, setTaxRatePct] = useState(13);
+  const [budgetImpact, setBudgetImpact] = useState(5);
+  const [needLevel, setNeedLevel] = useState(4);
+  const [useFrequency, setUseFrequency] = useState(7);
+  const [joyScore, setJoyScore] = useState(6);
+  const [longevity, setLongevity] = useState(6);
   const [workRelated, setWorkRelated] = useState(false);
 
   // Sell-to-offset
@@ -268,7 +266,7 @@ function BuyOrNot() {
   const [keepOldItem, setKeepOldItem] = useState(false);
   const [minimalismStrength, setMinimalismStrength] = useState(6);
 
-  // Risk/logistics sliders
+  // Risk/logistics
   const [returnPolicy, setReturnPolicy] = useState(7);
   const [warranty, setWarranty] = useState(6);
   const [spaceFit, setSpaceFit] = useState(8);
@@ -283,6 +281,40 @@ function BuyOrNot() {
     () => wFinancial + wUtility + wRisk,
     [wFinancial, wUtility, wRisk]
   );
+
+  // Persistence (localStorage)
+  type Entry = {
+    id: string;
+    createdAt: number;
+    name: string;
+    inputs: Record<string, any>;
+    outputs: {
+      decisionScore: number;
+      verdict: string;
+      effectiveCost: number;
+      resaleOffset: number;
+      costPerUse: number;
+    };
+  };
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem("bon_entries_v1");
+      if (raw) setEntries(JSON.parse(raw));
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("bon_entries_v1", JSON.stringify(entries));
+    } catch {}
+  }, [entries]);
+
+  const brand = {
+    title: "Buy‑or‑Not",
+    subtitle: "A tiny tool for clearer purchase decisions",
+  };
 
   // Derived cost
   const taxFor = (p: number) => (p * taxRatePct) / 100;
@@ -391,8 +423,8 @@ function BuyOrNot() {
     const returns = returnPolicy * 10;
     const warr = warranty * 8;
     const space = spaceFit * 8;
-    const alt = 100 - altAvailable * 7; // more good alternatives => lower score
-    const urg = urgency * 6; // higher urgency => higher score
+    const alt = 100 - altAvailable * 7;
+    const urg = urgency * 6;
     const clutterPenalty = keepOldItem ? minimalismStrength : 0;
     const base =
       0.3 * returns +
@@ -427,7 +459,7 @@ function BuyOrNot() {
     return { label: "Skip for now", tone: "red" as const };
   }, [decisionScore]);
 
-  // Sensitivity + wait-for-sale scoring
+  // Sensitivity/wait
   const bestOffset = Math.max(
     0,
     adjSalePrice -
@@ -436,7 +468,6 @@ function BuyOrNot() {
       adjTimeHours * hourlyValue -
       friction
   );
-
   const scoreFor = ({
     sticker,
     offset,
@@ -464,11 +495,10 @@ function BuyOrNot() {
         (workRelated ? 10 : 0) +
         utilAgg
     );
-    const risk = riskScore; // unchanged by price
+    const risk = riskScore;
     const weighted = wFinancial * fin + wUtility * util + wRisk * risk;
     return Math.round(clamp(weighted));
   };
-
   const sensitivity = useMemo(
     () => ({
       current: decisionScore,
@@ -490,24 +520,187 @@ function BuyOrNot() {
 
   const perUseBadge = useMemo(() => {
     if (costPerUse < 1)
-      return { tone: "green" as const, text: "stellar per-use" };
-    if (costPerUse < 3) return { tone: "blue" as const, text: "good per-use" };
-    if (costPerUse < 7) return { tone: "yellow" as const, text: "ok per-use" };
-    return { tone: "red" as const, text: "weak per-use" };
+      return { tone: "green" as const, text: "stellar per‑use" };
+    if (costPerUse < 3) return { tone: "blue" as const, text: "good per‑use" };
+    if (costPerUse < 7) return { tone: "yellow" as const, text: "ok per‑use" };
+    return { tone: "red" as const, text: "weak per‑use" };
   }, [costPerUse]);
+
+  // Actions
+  const resetForm = () => {
+    setItemName("");
+    setPrice(0);
+    setTaxRatePct(13);
+    setBudgetImpact(5);
+    setNeedLevel(5);
+    setUseFrequency(5);
+    setJoyScore(5);
+    setLongevity(5);
+    setWorkRelated(false);
+    setExpectSalePrice(0);
+    setSaleProbabilityPct(50);
+    setPlatformFees(0);
+    setShipCost(0);
+    setTimeHours(1);
+    setHourlyValue(30);
+    setFriction(0);
+    setResaleAggressive(false);
+    setCondKey("like_new");
+    setDemandKey("medium");
+    setSimulateWait(false);
+    setTargetDiscountPct(10);
+    setMonthsToWait(1);
+    setMonthsOwn(12);
+    setUsesPerWeek(3);
+    setKeepOldItem(false);
+    setMinimalismStrength(6);
+    setReturnPolicy(7);
+    setWarranty(6);
+    setSpaceFit(7);
+    setAltAvailable(5);
+    setUrgency(4);
+    setWFinancial(0.45);
+    setWUtility(0.4);
+    setWRisk(0.15);
+    setActiveId(null);
+  };
+
+  const saveEntry = () => {
+    const id = activeId ?? `${Date.now()}`;
+    const row = {
+      id,
+      createdAt: Date.now(),
+      name: itemName || "Untitled",
+      inputs: {
+        itemName,
+        price,
+        taxRatePct,
+        budgetImpact,
+        needLevel,
+        useFrequency,
+        joyScore,
+        longevity,
+        workRelated,
+        expectSalePrice,
+        saleProbabilityPct,
+        platformFees,
+        shipCost,
+        timeHours,
+        hourlyValue,
+        friction,
+        resaleAggressive,
+        condKey,
+        demandKey,
+        simulateWait,
+        targetDiscountPct,
+        monthsToWait,
+        monthsOwn,
+        usesPerWeek,
+        keepOldItem,
+        minimalismStrength,
+        returnPolicy,
+        warranty,
+        spaceFit,
+        altAvailable,
+        urgency,
+        wFinancial,
+        wUtility,
+        wRisk,
+      },
+      outputs: {
+        decisionScore,
+        verdict: verdict.label,
+        effectiveCost,
+        resaleOffset,
+        costPerUse,
+      },
+    } as Entry;
+    setEntries((prev) => {
+      const exists = prev.find((e) => e.id === id);
+      if (exists) return prev.map((e) => (e.id === id ? row : e));
+      return [row, ...prev];
+    });
+    if (!activeId) setActiveId(id);
+  };
+
+  const loadEntry = (e: Entry) => {
+    setActiveId(e.id);
+    const s = e.inputs as any;
+    setItemName(s.itemName);
+    setPrice(s.price);
+    setTaxRatePct(s.taxRatePct);
+    setBudgetImpact(s.budgetImpact);
+    setNeedLevel(s.needLevel);
+    setUseFrequency(s.useFrequency);
+    setJoyScore(s.joyScore);
+    setLongevity(s.longevity);
+    setWorkRelated(s.workRelated);
+    setExpectSalePrice(s.expectSalePrice);
+    setSaleProbabilityPct(s.saleProbabilityPct);
+    setPlatformFees(s.platformFees);
+    setShipCost(s.shipCost);
+    setTimeHours(s.timeHours);
+    setHourlyValue(s.hourlyValue);
+    setFriction(s.friction);
+    setResaleAggressive(s.resaleAggressive);
+    setCondKey(s.condKey);
+    setDemandKey(s.demandKey);
+    setSimulateWait(s.simulateWait);
+    setTargetDiscountPct(s.targetDiscountPct);
+    setMonthsToWait(s.monthsToWait);
+    setMonthsOwn(s.monthsOwn);
+    setUsesPerWeek(s.usesPerWeek);
+    setKeepOldItem(s.keepOldItem);
+    setMinimalismStrength(s.minimalismStrength);
+    setReturnPolicy(s.returnPolicy);
+    setWarranty(s.warranty);
+    setSpaceFit(s.spaceFit);
+    setAltAvailable(s.altAvailable);
+    setUrgency(s.urgency);
+    setWFinancial(s.wFinancial);
+    setWUtility(s.wUtility);
+    setWRisk(s.wRisk);
+  };
+
+  const deleteEntry = (id: string) =>
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+
+  const copySummary = async () => {
+    const lines = [
+      `Decision: ${verdict.label} (${decisionScore}/100)`,
+      `Item: ${itemName || "Untitled"}`,
+      `Sticker: ${currency(stickerCost)} | Effective after resale: ${currency(
+        effectiveCost
+      )} (offset ${currency(resaleOffset)})`,
+      `Per‑use: ${currency(costPerUse)} (over ~${Math.round(
+        totalExpectedUses
+      )} uses)`,
+      `Scores — Financial ${Math.round(financialScore)}, Utility ${Math.round(
+        utilityScore
+      )}, Risk ${Math.round(riskScore)}`,
+      simulateWait
+        ? `Alt (wait ${monthsToWait} mo @ −${targetDiscountPct}%): ${sensitivity.waitSale}`
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(lines);
+      alert("Summary copied to clipboard ✨");
+    } catch (err) {
+      console.warn(err);
+      alert("Could not copy automatically — open console for text.");
+      console.log(lines);
+    }
+  };
 
   // ---------- Render ----------
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Buy-or-Not Calculator
-          </h1>
-          <p className="text-sm text-gray-500">
-            Decide smarter with resale offsets, wait-for-sale sim, per-use math
-            & minimalism nudge.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{brand.title}</h1>
+          <p className="text-sm text-gray-500">{brand.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <Pill tone={perUseBadge.tone}>{perUseBadge.text}</Pill>
@@ -517,7 +710,27 @@ function BuyOrNot() {
         </div>
       </header>
 
-      {/* Item & Wait-for-Sale */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="px-4 py-2 rounded-xl bg-gray-900 text-white"
+          onClick={saveEntry}
+        >
+          Save entry
+        </button>
+        <button
+          className="px-4 py-2 rounded-xl bg-white border"
+          onClick={resetForm}
+        >
+          New entry
+        </button>
+        <button
+          className="px-4 py-2 rounded-xl bg-white border"
+          onClick={copySummary}
+        >
+          Copy decision summary
+        </button>
+      </div>
+
       <Section title="Item" subtitle="Fill in your basics">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="md:col-span-2">
@@ -529,14 +742,13 @@ function BuyOrNot() {
             />
           </label>
           <LabeledNumber
-            label="Price (pre-tax)"
+            label="Price (pre‑tax)"
             value={price}
             onChange={setPrice}
             min={0}
             step={1}
           />
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <LabeledNumber
             label="Sales tax %"
@@ -552,7 +764,6 @@ function BuyOrNot() {
               <span className="font-medium">{currency(stickerCost)}</span>
             </div>
           </div>
-
           <Toggle
             label="Simulate waiting for a sale"
             checked={simulateWait}
@@ -588,9 +799,7 @@ function BuyOrNot() {
         </div>
       </Section>
 
-      {/* Three-column: Resale, Utility, Risk */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sell-to-Offset */}
         <Section
           title="Sell-to-Offset"
           subtitle="Estimate what you’ll recoup by selling the old thing"
@@ -611,24 +820,29 @@ function BuyOrNot() {
                 max={100}
               />
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Select
                 label="Condition"
                 value={condKey}
-                onChange={(v) =>
-                  setCondKey(v as (typeof CONDITION_PRESETS)[number]["key"])
+                onChange={setCondKey}
+                options={
+                  CONDITION_PRESETS as unknown as {
+                    key: typeof condKey;
+                    label: string;
+                  }[]
                 }
-                options={CONDITION_PRESETS as any}
                 hint="Adjusts expected price & probability"
               />
               <Select
                 label="Demand"
                 value={demandKey}
-                onChange={(v) =>
-                  setDemandKey(v as (typeof DEMAND_PRESETS)[number]["key"])
+                onChange={setDemandKey}
+                options={
+                  DEMAND_PRESETS as unknown as {
+                    key: typeof demandKey;
+                    label: string;
+                  }[]
                 }
-                options={DEMAND_PRESETS as any}
                 hint="Adjusts probability & time"
               />
               <div className="bg-gray-50 rounded-xl p-3 text-sm flex flex-col justify-center">
@@ -644,7 +858,6 @@ function BuyOrNot() {
                 </div>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <LabeledNumber
                 label="Platform/marketplace fees"
@@ -672,7 +885,6 @@ function BuyOrNot() {
                 min={0}
               />
             </div>
-
             <LabeledNumber
               label="Friction/misc cost"
               value={friction}
@@ -680,14 +892,12 @@ function BuyOrNot() {
               min={0}
               hint="Gas, cleaning, odds & ends"
             />
-
             <Toggle
               label="Aggressive resale influence"
               checked={resaleAggressive}
               onChange={setResaleAggressive}
               hint="If on, strong resale also nudges Utility/Joy."
             />
-
             <div className="bg-gray-50 rounded-xl p-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
                 Resale offset:{" "}
@@ -701,7 +911,6 @@ function BuyOrNot() {
           </div>
         </Section>
 
-        {/* Utility & Joy */}
         <Section title="Utility & Joy" subtitle="How much value do you get?">
           <div className="space-y-3">
             <Slider
@@ -740,7 +949,6 @@ function BuyOrNot() {
           </div>
         </Section>
 
-        {/* Risk, Logistics & Minimalism */}
         <Section
           title="Risk, Logistics & Minimalism"
           subtitle="How safe/easy is this purchase?"
@@ -800,8 +1008,7 @@ function BuyOrNot() {
         </Section>
       </div>
 
-      {/* Budget & Per-Use */}
-      <Section title="Budget Impact & Per-Use">
+      <Section title="Budget Impact & Per‑Use">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Slider
             label="Budget pain (higher = hurts)"
@@ -857,7 +1064,6 @@ function BuyOrNot() {
         </div>
       </Section>
 
-      {/* Weights & Sensitivity */}
       <Section
         title="Weights & Sensitivity"
         subtitle="Tune how much each pillar matters"
@@ -895,7 +1101,6 @@ function BuyOrNot() {
         >
           Weights should sum to ~1. Current: {sumW.toFixed(2)}
         </p>
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
           <div className="bg-gray-50 rounded-xl p-3 text-sm">
             Score now:{" "}
@@ -918,7 +1123,61 @@ function BuyOrNot() {
         </div>
       </Section>
 
-      {/* Explain the Math */}
+      <Section
+        title="History"
+        subtitle="Your saved purchase ideas (stored in this browser)"
+      >
+        {entries.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No entries yet. Tune something above and hit{" "}
+            <span className="font-medium">Save entry</span>.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {entries.map((e) => (
+              <div
+                key={e.id}
+                className={`flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-xl p-3 ${
+                  activeId === e.id ? "border-gray-900" : "border-gray-200"
+                }`}
+              >
+                <div className="flex-1">
+                  <div className="text-sm font-medium">{e.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {new Date(e.createdAt).toLocaleString()} •{" "}
+                    {e.outputs.verdict} • {e.outputs.decisionScore}/100 • Eff:{" "}
+                    {currency(e.outputs.effectiveCost)}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="px-3 py-1.5 rounded-lg bg-white border"
+                    onClick={() => loadEntry(e)}
+                  >
+                    Load
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-lg bg-white border"
+                    onClick={() => {
+                      setItemName(e.inputs.itemName);
+                      setActiveId(e.id);
+                    }}
+                  >
+                    Rename via Item
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200"
+                    onClick={() => deleteEntry(e.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
       <Section title="Explain the Math" subtitle="Transparent formula sketch">
         <div className="text-sm space-y-2">
           <p>
@@ -929,11 +1188,11 @@ function BuyOrNot() {
           <p>
             <span className="font-medium">AdjSalePrice</span> &{" "}
             <span className="font-medium">AdjProb</span> come from Condition &
-            Demand.
+            Demand presets.
           </p>
           <p>
             <span className="font-medium">Financial</span> ≈ 43%·Affordability +
-            32%·Usage + 20%·PriceDrag (+ optional ResaleBonus + Per-Use bonus)
+            32%·Usage + 20%·PriceDrag (+ optional ResaleBonus + Per‑Use bonus)
           </p>
           <p>
             <span className="font-medium">Utility/Joy</span> ≈ 40%·Need +
@@ -950,11 +1209,22 @@ function BuyOrNot() {
             Wu·Utility + Wr·Risk (0–100)
           </p>
           <p>
-            <span className="font-medium">Wait-for-Sale</span> sim recomputes
-            sticker price at target discount and shows the alternate score.
+            <span className="font-medium">Wait‑for‑Sale</span> simulator
+            recomputes sticker price at the target discount and shows the
+            alternative score.
           </p>
         </div>
       </Section>
+
+      <footer className="pt-2 text-xs text-gray-500 flex items-center justify-between">
+        <div>
+          Made by <span className="font-medium">you</span>. Weights & formulas
+          are editable — trust your judgment.
+        </div>
+        <a className="underline" href="#top">
+          Back to top
+        </a>
+      </footer>
     </div>
   );
 }

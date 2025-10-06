@@ -1,8 +1,19 @@
-# React + Tailwind
+# Buy-or-Not Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules. One top of the standard Vite setup, [tailwindcss](https://tailwindcss.com/) is installed and ready to be used in React components.
+A tiny tool to decide smarter: resale offsets, wait-for-sale sim, per-use math, minimalism nudge, and saved history (localStorage).
 
-Additional references:
-* [Getting started with Vite](https://vitejs.dev/guide/)
-* [Tailwind documentation](https://tailwindcss.com/docs/installation)
+## Tech
 
+- React + Vite
+- Tailwind CSS
+- TypeScript-friendly
+- Deployed on Vercel
+
+## Commands (local dev)
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run preview
+```
