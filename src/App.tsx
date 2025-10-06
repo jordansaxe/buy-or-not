@@ -2,14 +2,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 /**
- * Buy-or-Not Calculator
- * - Sell-to-Offset (fees, shipping, time value, friction)
- * - Condition & Demand presets
- * - Wait-for-Sale simulator
- * - Per-use math
- * - Minimalism nudge
- * - Weights & sensitivity
- * - Saved History (localStorage)
+ * Buy-or-Not — with sticky right-side Decision Summary
+ * - Two-column layout (left: inputs, right: sticky summary)
+ * - All your previous logic (resale, wait, per-use, minimalism, weights, history)
+ * - Polished UI using Tailwind utility classes (card, btn-*)
+ *
+ * Note: for best look, add the small helpers in src/index.css from earlier:
+ * .card, .btn, .btn-primary, .btn-ghost, .btn-danger, .eyebrow, shadow-soft, etc.
  */
 
 // ---------- Helpers ----------
@@ -217,6 +216,218 @@ function Pill({
     >
       {children}
     </span>
+  );
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const v = Math.max(0, Math.min(100, Math.round(value)));
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="font-medium text-slate-700">{label}</span>
+        <span className="tabular-nums text-slate-500">{v}/100</span>
+      </div>
+      <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-slate-900 to-slate-600"
+          style={{ width: `${v}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 text-xs px-2 py-1">
+      {children}
+    </span>
+  );
+}
+
+// ---------- Decision Summary (Sticky Sidebar) ----------
+function DecisionSummary(props: {
+  verdictLabel: string;
+  decisionScore: number;
+  stickerCost: number;
+  effectiveCost: number;
+  resaleOffset: number;
+  costPerUse: number;
+  sensitivity: {
+    current: number;
+    noResale: number;
+    bestResale: number;
+    waitSale: number | null;
+  };
+  simulateWait: boolean;
+  monthsToWait: number;
+  targetDiscountPct: number;
+
+  budgetImpact: number;
+  useFrequency: number;
+  longevity: number;
+  price: number;
+  taxFor: (p: number) => number;
+  needLevel: number;
+  joyScore: number;
+  workRelated: boolean;
+  resaleAggressive: boolean;
+  altAvailable: number;
+  returnPolicy: number;
+  warranty: number;
+  spaceFit: number;
+  urgency: number;
+  keepOldItem: boolean;
+  minimalismStrength: number;
+}) {
+  const {
+    verdictLabel,
+    decisionScore,
+    stickerCost,
+    effectiveCost,
+    resaleOffset,
+    costPerUse,
+    sensitivity,
+    simulateWait,
+    monthsToWait,
+    targetDiscountPct,
+    budgetImpact,
+    useFrequency,
+    longevity,
+    price,
+    taxFor,
+    needLevel,
+    joyScore,
+    workRelated,
+    resaleAggressive,
+    altAvailable,
+    returnPolicy,
+    warranty,
+    spaceFit,
+    urgency,
+    keepOldItem,
+    minimalismStrength,
+  } = props;
+
+  // Intuitive driver values (0-100) for display
+  const affordability = clamp(100 - budgetImpact * 10);
+  const usage = clamp(useFrequency * 8 + longevity * 4);
+  const priceDrag = clamp(100 - (effectiveCost / Math.max(1, price)) * 50);
+  const resaleStrength = clamp((resaleOffset / Math.max(1, stickerCost)) * 100);
+  const need = needLevel * 10;
+  const joy = joyScore * 10;
+  const freq = useFrequency * 8;
+  const work = workRelated ? 100 : 0;
+  const returns = returnPolicy * 10;
+  const warr = warranty * 8;
+  const space = spaceFit * 8;
+  const alternatives = clamp(100 - altAvailable * 7);
+  const urg = urgency * 6;
+
+  return (
+    <aside className="sticky top-4">
+      <section className="card p-6 space-y-5">
+        <div>
+          <div className="text-sm text-slate-500 mb-1">Decision</div>
+          <div className="flex items-center gap-3">
+            <div className="text-3xl font-extrabold tracking-tight">
+              {verdictLabel}
+            </div>
+            <Chip>{decisionScore}/100</Chip>
+          </div>
+          <p className="text-sm text-slate-500 mt-2">
+            Sticker:{" "}
+            <span className="font-medium">{currency(stickerCost)}</span> •
+            Effective:{" "}
+            <span className="font-medium">{currency(effectiveCost)}</span>{" "}
+            <span className="text-slate-400">
+              (offset {currency(resaleOffset)})
+            </span>
+          </p>
+          <p className="text-sm text-slate-500">
+            Cost per use:{" "}
+            <span className="font-medium">{currency(costPerUse)}</span>{" "}
+            <span className="text-slate-400">
+              (tax {currency(taxFor(price))})
+            </span>
+          </p>
+          {simulateWait && (
+            <p className="text-sm text-slate-500 mt-1">
+              Wait <span className="font-medium">{monthsToWait} mo</span> @{" "}
+              <span className="font-medium">−{targetDiscountPct}%</span> → score{" "}
+              <span className="font-medium">{sensitivity.waitSale}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-sm font-medium text-slate-700 mb-2">
+            Sensitivity
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Now</span>
+              <span className="font-semibold">{sensitivity.current}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>No resale</span>
+              <span className="font-semibold">{sensitivity.noResale}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Best-case resale</span>
+              <span className="font-semibold">{sensitivity.bestResale}</span>
+            </div>
+            {simulateWait && (
+              <div className="flex items-center justify-between">
+                <span>Wait scenario</span>
+                <span className="font-semibold">{sensitivity.waitSale}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div>
+            <div className="eyebrow mb-2">Financial</div>
+            <div className="space-y-3">
+              <ScoreBar label="Affordability" value={affordability} />
+              <ScoreBar label="Usage (freq + longevity)" value={usage} />
+              <ScoreBar label="Price drag" value={priceDrag} />
+              <ScoreBar label="Resale strength" value={resaleStrength} />
+            </div>
+          </div>
+          <div>
+            <div className="eyebrow mb-2">Utility & Joy</div>
+            <div className="space-y-3">
+              <ScoreBar label="Need" value={need} />
+              <ScoreBar label="Frequency" value={freq} />
+              <ScoreBar label="Joy" value={joy} />
+              <ScoreBar label="Work boost" value={work} />
+            </div>
+          </div>
+          <div>
+            <div className="eyebrow mb-2">Risk & Logistics</div>
+            <div className="space-y-3">
+              <ScoreBar label="Return policy" value={returns} />
+              <ScoreBar label="Warranty/Support" value={warr} />
+              <ScoreBar label="Space fit" value={space} />
+              <ScoreBar label="Fewer alternatives" value={alternatives} />
+              <ScoreBar label="Urgency" value={urg} />
+            </div>
+            {props.keepOldItem && (
+              <div className="mt-2">
+                <Chip>minimalism penalty −{props.minimalismStrength}</Chip>
+              </div>
+            )}
+            {props.resaleAggressive && (
+              <div className="mt-2">
+                <Chip>aggressive resale influence</Chip>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </aside>
   );
 }
 
@@ -713,9 +924,9 @@ function BuyOrNot() {
 
   // ---------- Render ----------
   return (
-    <div className="max-w-content mx-auto p-6 space-y-6">
+    <div className="max-w-content mx-auto p-6">
       {/* Header */}
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-transparent">
             {brand.title}
@@ -730,480 +941,533 @@ function BuyOrNot() {
         </div>
       </header>
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={saveEntry}>
-          Save entry
-        </button>
-        <button className="btn-ghost" onClick={resetForm}>
-          New entry
-        </button>
-        <button className="btn-ghost" onClick={copySummary}>
-          Copy summary
-        </button>
-      </div>
-
-      {/* Item & Wait-for-Sale */}
-      <Section title="Item" subtitle="Fill in your basics">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <label className="md:col-span-2">
-            <span className="text-sm font-medium text-slate-700">
-              Item name
-            </span>
-            <input
-              className="mt-1 w-full rounded-xl border-slate-200 focus:border-slate-400 focus:ring-0"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              placeholder="e.g., Sony WH-1000XM5"
-            />
-          </label>
-          <LabeledNumber
-            label="Price (pre-tax)"
-            value={price}
-            onChange={setPrice}
-            min={0}
-            step={1}
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <LabeledNumber
-            label="Sales tax %"
-            value={taxRatePct}
-            onChange={setTaxRatePct}
-            min={0}
-            max={30}
-            step={0.5}
-          />
-          <div className="flex items-end">
-            <div className="text-sm text-slate-600">
-              Sticker (now):{" "}
-              <span className="font-medium">{currency(stickerCost)}</span>
-            </div>
+      {/* Two-column layout: left = content, right = sticky summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* LEFT: controls & details */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-primary" onClick={saveEntry}>
+              Save entry
+            </button>
+            <button className="btn-ghost" onClick={resetForm}>
+              New entry
+            </button>
+            <button className="btn-ghost" onClick={copySummary}>
+              Copy summary
+            </button>
           </div>
-          <Toggle
-            label="Simulate waiting for a sale"
-            checked={simulateWait}
-            onChange={setSimulateWait}
-          />
-          {simulateWait && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:col-span-4">
-              <Slider
-                label="Target price drop"
-                value={targetDiscountPct}
-                onChange={setTargetDiscountPct}
-                min={0}
-                max={40}
-                step={5}
-                suffixFn={(v) => `−${v}%`}
-              />
-              <LabeledNumber
-                label="Months to wait"
-                value={monthsToWait}
-                onChange={setMonthsToWait}
-                min={0}
-                max={24}
-                step={1}
-              />
-              <div className="flex items-end text-sm text-slate-600">
-                Sticker if on sale:{" "}
-                <span className="font-medium ml-1">
-                  {currency(stickerCostWait)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sell-to-Offset */}
-        <Section
-          title="Sell-to-Offset"
-          subtitle="Estimate what you’ll recoup by selling the old thing"
-        >
-          <div className="grid grid-cols-1 gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Section title="Item" subtitle="Fill in your basics">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Item name
+                </span>
+                <input
+                  className="mt-1 w-full rounded-xl border-slate-200 focus:border-slate-400 focus:ring-0"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  placeholder="e.g., Sony WH-1000XM5"
+                />
+              </label>
               <LabeledNumber
-                label="Expected sale price (before presets)"
-                value={expectSalePrice}
-                onChange={setExpectSalePrice}
+                label="Price (pre-tax)"
+                value={price}
+                onChange={setPrice}
                 min={0}
-              />
-              <LabeledNumber
-                label="Base probability of sale"
-                value={saleProbabilityPct}
-                onChange={setSaleProbabilityPct}
-                min={0}
-                max={100}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select
-                label="Condition"
-                value={condKey}
-                onChange={setCondKey}
-                options={
-                  CONDITION_PRESETS as unknown as {
-                    key: typeof condKey;
-                    label: string;
-                  }[]
-                }
-                hint="Adjusts expected price & probability"
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <LabeledNumber
+                label="Sales tax %"
+                value={taxRatePct}
+                onChange={setTaxRatePct}
+                min={0}
+                max={30}
+                step={0.5}
               />
-              <Select
-                label="Demand"
-                value={demandKey}
-                onChange={setDemandKey}
-                options={
-                  DEMAND_PRESETS as unknown as {
-                    key: typeof demandKey;
-                    label: string;
-                  }[]
-                }
-                hint="Adjusts probability & time"
-              />
-              <div className="bg-slate-50 rounded-xl p-3 text-sm flex flex-col justify-center">
-                <div>
-                  Adj probability:{" "}
-                  <span className="font-semibold">{pct(adjSaleProb)}</span>
+              <div className="flex items-end">
+                <div className="text-sm text-slate-600">
+                  Sticker (now):{" "}
+                  <span className="font-medium">{currency(stickerCost)}</span>
                 </div>
-                <div>
-                  Adj sale price:{" "}
+              </div>
+              <Toggle
+                label="Simulate waiting for a sale"
+                checked={simulateWait}
+                onChange={setSimulateWait}
+              />
+              {simulateWait && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:col-span-4">
+                  <Slider
+                    label="Target price drop"
+                    value={targetDiscountPct}
+                    onChange={setTargetDiscountPct}
+                    min={0}
+                    max={40}
+                    step={5}
+                    suffixFn={(v) => `−${v}%`}
+                  />
+                  <LabeledNumber
+                    label="Months to wait"
+                    value={monthsToWait}
+                    onChange={setMonthsToWait}
+                    min={0}
+                    max={24}
+                    step={1}
+                  />
+                  <div className="flex items-end text-sm text-slate-600">
+                    Sticker if on sale:{" "}
+                    <span className="font-medium ml-1">
+                      {currency(stickerCostWait)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Section
+              title="Sell-to-Offset"
+              subtitle="Estimate what you’ll recoup by selling the old thing"
+            >
+              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <LabeledNumber
+                    label="Expected sale price (before presets)"
+                    value={expectSalePrice}
+                    onChange={setExpectSalePrice}
+                    min={0}
+                  />
+                  <LabeledNumber
+                    label="Base probability of sale"
+                    value={saleProbabilityPct}
+                    onChange={setSaleProbabilityPct}
+                    min={0}
+                    max={100}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Select
+                    label="Condition"
+                    value={condKey}
+                    onChange={setCondKey}
+                    options={
+                      CONDITION_PRESETS as unknown as {
+                        key: typeof condKey;
+                        label: string;
+                      }[]
+                    }
+                    hint="Adjusts expected price & probability"
+                  />
+                  <Select
+                    label="Demand"
+                    value={demandKey}
+                    onChange={setDemandKey}
+                    options={
+                      DEMAND_PRESETS as unknown as {
+                        key: typeof demandKey;
+                        label: string;
+                      }[]
+                    }
+                    hint="Adjusts probability & time"
+                  />
+                  <div className="bg-slate-50 rounded-xl p-3 text-sm flex flex-col justify-center">
+                    <div>
+                      Adj probability:{" "}
+                      <span className="font-semibold">{pct(adjSaleProb)}</span>
+                    </div>
+                    <div>
+                      Adj sale price:{" "}
+                      <span className="font-semibold">
+                        {currency(adjSalePrice)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <LabeledNumber
+                    label="Platform/marketplace fees"
+                    value={platformFees}
+                    onChange={setPlatformFees}
+                    min={0}
+                  />
+                  <LabeledNumber
+                    label="Shipping & packaging"
+                    value={shipCost}
+                    onChange={setShipCost}
+                    min={0}
+                  />
+                  <LabeledNumber
+                    label="Your time (hours)"
+                    value={timeHours}
+                    onChange={setTimeHours}
+                    min={0}
+                    step={0.5}
+                  />
+                  <LabeledNumber
+                    label="Your time value ($/hr)"
+                    value={hourlyValue}
+                    onChange={setHourlyValue}
+                    min={0}
+                  />
+                </div>
+                <LabeledNumber
+                  label="Friction/misc cost"
+                  value={friction}
+                  onChange={setFriction}
+                  min={0}
+                  hint="Gas, cleaning, odds & ends"
+                />
+                <Toggle
+                  label="Aggressive resale influence"
+                  checked={resaleAggressive}
+                  onChange={setResaleAggressive}
+                  hint="If on, strong resale also nudges Utility/Joy."
+                />
+                <div className="bg-slate-50 rounded-xl p-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    Resale offset:{" "}
+                    <span className="font-semibold">
+                      {currency(resaleOffset)}
+                    </span>
+                  </div>
+                  <div>
+                    Effective cost after offset:{" "}
+                    <span className="font-semibold">
+                      {currency(effectiveCost)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            <Section
+              title="Utility & Joy"
+              subtitle="How much value do you get?"
+            >
+              <div className="space-y-3">
+                <Slider
+                  label="Need level"
+                  value={needLevel}
+                  onChange={setNeedLevel}
+                />
+                <Slider
+                  label="Use frequency"
+                  value={useFrequency}
+                  onChange={setUseFrequency}
+                />
+                <Slider
+                  label="Joy/delight"
+                  value={joyScore}
+                  onChange={setJoyScore}
+                />
+                <Slider
+                  label="Longevity (subjective)"
+                  value={longevity}
+                  onChange={setLongevity}
+                />
+                <Toggle
+                  label="Work related (productivity/earning)"
+                  checked={workRelated}
+                  onChange={setWorkRelated}
+                />
+                <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                  Utility/Joy sub-score:{" "}
                   <span className="font-semibold">
-                    {currency(adjSalePrice)}
+                    {Math.round(utilityScore)}
                   </span>
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <LabeledNumber
-                label="Platform/marketplace fees"
-                value={platformFees}
-                onChange={setPlatformFees}
-                min={0}
-              />
-              <LabeledNumber
-                label="Shipping & packaging"
-                value={shipCost}
-                onChange={setShipCost}
-                min={0}
-              />
-              <LabeledNumber
-                label="Your time (hours)"
-                value={timeHours}
-                onChange={setTimeHours}
-                min={0}
-                step={0.5}
-              />
-              <LabeledNumber
-                label="Your time value ($/hr)"
-                value={hourlyValue}
-                onChange={setHourlyValue}
-                min={0}
-              />
-            </div>
-            <LabeledNumber
-              label="Friction/misc cost"
-              value={friction}
-              onChange={setFriction}
-              min={0}
-              hint="Gas, cleaning, odds & ends"
-            />
-            <Toggle
-              label="Aggressive resale influence"
-              checked={resaleAggressive}
-              onChange={setResaleAggressive}
-              hint="If on, strong resale also nudges Utility/Joy."
-            />
-            <div className="bg-slate-50 rounded-xl p-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div>
-                Resale offset:{" "}
-                <span className="font-semibold">{currency(resaleOffset)}</span>
-              </div>
-              <div>
-                Effective cost after offset:{" "}
-                <span className="font-semibold">{currency(effectiveCost)}</span>
-              </div>
-            </div>
-          </div>
-        </Section>
+            </Section>
 
-        {/* Utility & Joy */}
-        <Section title="Utility & Joy" subtitle="How much value do you get?">
-          <div className="space-y-3">
-            <Slider
-              label="Need level"
-              value={needLevel}
-              onChange={setNeedLevel}
-            />
-            <Slider
-              label="Use frequency"
-              value={useFrequency}
-              onChange={setUseFrequency}
-            />
-            <Slider
-              label="Joy/delight"
-              value={joyScore}
-              onChange={setJoyScore}
-            />
-            <Slider
-              label="Longevity (subjective)"
-              value={longevity}
-              onChange={setLongevity}
-            />
-            <Toggle
-              label="Work related (productivity/earning)"
-              checked={workRelated}
-              onChange={setWorkRelated}
-            />
-            <div className="bg-slate-50 rounded-xl p-3 text-sm">
-              Utility/Joy sub-score:{" "}
-              <span className="font-semibold">{Math.round(utilityScore)}</span>
-            </div>
+            <Section
+              title="Risk, Logistics & Minimalism"
+              subtitle="How safe/easy is this purchase?"
+            >
+              <div className="space-y-3">
+                <Slider
+                  label="Return policy"
+                  value={returnPolicy}
+                  onChange={setReturnPolicy}
+                />
+                <Slider
+                  label="Warranty/support"
+                  value={warranty}
+                  onChange={setWarranty}
+                />
+                <Slider
+                  label="Space fit"
+                  value={spaceFit}
+                  onChange={setSpaceFit}
+                />
+                <Slider
+                  label="Good alternatives exist"
+                  value={altAvailable}
+                  onChange={setAltAvailable}
+                />
+                <Slider
+                  label="Urgency/time sensitivity"
+                  value={urgency}
+                  onChange={setUrgency}
+                />
+                <Toggle
+                  label="Keeping the old item (adds clutter)"
+                  checked={keepOldItem}
+                  onChange={setKeepOldItem}
+                />
+                {keepOldItem && (
+                  <Slider
+                    label="Minimalism nudge strength (penalty)"
+                    value={minimalismStrength}
+                    onChange={setMinimalismStrength}
+                    min={0}
+                    max={12}
+                    step={1}
+                    suffixFn={(v) => `−${v} pts`}
+                  />
+                )}
+                <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                  Risk/Logistics sub-score:{" "}
+                  <span className="font-semibold">{Math.round(riskScore)}</span>
+                </div>
+              </div>
+            </Section>
           </div>
-        </Section>
 
-        {/* Risk, Logistics & Minimalism */}
-        <Section
-          title="Risk, Logistics & Minimalism"
-          subtitle="How safe/easy is this purchase?"
-        >
-          <div className="space-y-3">
-            <Slider
-              label="Return policy"
-              value={returnPolicy}
-              onChange={setReturnPolicy}
-            />
-            <Slider
-              label="Warranty/support"
-              value={warranty}
-              onChange={setWarranty}
-            />
-            <Slider label="Space fit" value={spaceFit} onChange={setSpaceFit} />
-            <Slider
-              label="Good alternatives exist"
-              value={altAvailable}
-              onChange={setAltAvailable}
-            />
-            <Slider
-              label="Urgency/time sensitivity"
-              value={urgency}
-              onChange={setUrgency}
-            />
-            <Toggle
-              label="Keeping the old item (adds clutter)"
-              checked={keepOldItem}
-              onChange={setKeepOldItem}
-            />
-            {keepOldItem && (
+          <Section title="Budget Impact & Per-Use">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <Slider
-                label="Minimalism nudge strength (penalty)"
-                value={minimalismStrength}
-                onChange={setMinimalismStrength}
-                min={0}
-                max={12}
-                step={1}
-                suffixFn={(v) => `−${v} pts`}
+                label="Budget pain (higher = hurts)"
+                value={budgetImpact}
+                onChange={setBudgetImpact}
               />
-            )}
-            <div className="bg-slate-50 rounded-xl p-3 text-sm">
-              Risk/Logistics sub-score:{" "}
-              <span className="font-semibold">{Math.round(riskScore)}</span>
-            </div>
-          </div>
-        </Section>
-      </div>
-
-      {/* Budget Impact & Per-Use */}
-      <Section title="Budget Impact & Per-Use">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Slider
-            label="Budget pain (higher = hurts)"
-            value={budgetImpact}
-            onChange={setBudgetImpact}
-          />
-          <div className="bg-slate-50 rounded-xl p-3 text-sm flex items-center justify-between">
-            <div>
-              <div>
-                Financial sub-score:{" "}
-                <span className="font-semibold">
-                  {Math.round(financialScore)}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500">
-                Uses effective cost, usage & budget pain.
-              </div>
-            </div>
-            <div className="text-right">
-              <div>
-                Tax:{" "}
-                <span className="font-medium">{currency(taxFor(price))}</span>
-              </div>
-              <div>
-                Effective cost:{" "}
-                <span className="font-medium">{currency(effectiveCost)}</span>
-              </div>
-            </div>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <LabeledNumber
-                label="Months you’ll own it"
-                value={monthsOwn}
-                onChange={setMonthsOwn}
-                min={1}
-                max={120}
-              />
-              <LabeledNumber
-                label="Uses per week"
-                value={usesPerWeek}
-                onChange={setUsesPerWeek}
-                min={1}
-                max={21}
-              />
-            </div>
-            <div className="mt-2">
-              Cost per use (after resale):{" "}
-              <span className="font-semibold">{currency(costPerUse)}</span>
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      {/* Weights & Sensitivity */}
-      <Section
-        title="Weights & Sensitivity"
-        subtitle="Tune how much each pillar matters"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <LabeledNumber
-            label="Weight: Financial"
-            value={wFinancial}
-            onChange={setWFinancial}
-            min={0}
-            max={1}
-            step={0.05}
-          />
-          <LabeledNumber
-            label="Weight: Utility/Joy"
-            value={wUtility}
-            onChange={setWUtility}
-            min={0}
-            max={1}
-            step={0.05}
-          />
-          <LabeledNumber
-            label="Weight: Risk/Logistics"
-            value={wRisk}
-            onChange={setWRisk}
-            min={0}
-            max={1}
-            step={0.05}
-          />
-        </div>
-        <p
-          className={`text-xs mt-2 ${
-            Math.abs(sumW - 1) < 0.01 ? "text-slate-500" : "text-red-600"
-          }`}
-        >
-          Weights should sum to ~1. Current: {sumW.toFixed(2)}
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-          <div className="bg-slate-50 rounded-xl p-3 text-sm">
-            Score now:{" "}
-            <span className="font-semibold">{sensitivity.current}</span>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-3 text-sm">
-            If no resale:{" "}
-            <span className="font-semibold">{sensitivity.noResale}</span>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-3 text-sm">
-            If best-case resale:{" "}
-            <span className="font-semibold">{sensitivity.bestResale}</span>
-          </div>
-          {simulateWait && (
-            <div className="bg-slate-50 rounded-xl p-3 text-sm">
-              If you wait {monthsToWait} mo @ −{targetDiscountPct}%:{" "}
-              <span className="font-semibold">{sensitivity.waitSale}</span>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      {/* History */}
-      <Section
-        title="History"
-        subtitle="Your saved purchase ideas (stored in this browser)"
-      >
-        {entries.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            No entries yet. Tune something above and hit{" "}
-            <span className="font-medium">Save entry</span>.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {entries.map((e) => (
-              <div
-                key={e.id}
-                className={`flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-xl p-3 ${
-                  activeId === e.id ? "border-slate-900" : "border-slate-200"
-                }`}
-              >
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{e.name}</div>
+              <div className="bg-slate-50 rounded-xl p-3 text-sm flex items-center justify-between">
+                <div>
+                  <div>
+                    Financial sub-score:{" "}
+                    <span className="font-semibold">
+                      {Math.round(financialScore)}
+                    </span>
+                  </div>
                   <div className="text-xs text-slate-500">
-                    {new Date(e.createdAt).toLocaleString()} •{" "}
-                    {e.outputs.verdict} • {e.outputs.decisionScore}/100 • Eff:{" "}
-                    {currency(e.outputs.effectiveCost)}
+                    Uses effective cost, usage & budget pain.
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button className="btn-ghost" onClick={() => loadEntry(e)}>
-                    Load
-                  </button>
-                  <button
-                    className="btn-ghost"
-                    onClick={() => {
-                      setItemName(e.inputs.itemName);
-                      setActiveId(e.id);
-                    }}
-                  >
-                    Rename via Item
-                  </button>
-                  <button
-                    className="btn-danger"
-                    onClick={() => deleteEntry(e.id)}
-                  >
-                    Delete
-                  </button>
+                <div className="text-right">
+                  <div>
+                    Tax:{" "}
+                    <span className="font-medium">
+                      {currency(taxFor(price))}
+                    </span>
+                  </div>
+                  <div>
+                    Effective cost:{" "}
+                    <span className="font-medium">
+                      {currency(effectiveCost)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </Section>
+              <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <LabeledNumber
+                    label="Months you’ll own it"
+                    value={monthsOwn}
+                    onChange={setMonthsOwn}
+                    min={1}
+                    max={120}
+                  />
+                  <LabeledNumber
+                    label="Uses per week"
+                    value={usesPerWeek}
+                    onChange={setUsesPerWeek}
+                    min={1}
+                    max={21}
+                  />
+                </div>
+                <div className="mt-2">
+                  Cost per use (after resale):{" "}
+                  <span className="font-semibold">{currency(costPerUse)}</span>
+                </div>
+              </div>
+            </div>
+          </Section>
 
-      {/* Explain the Math */}
-      <Section title="Explain the Math" subtitle="Transparent formula sketch">
-        <div className="text-sm space-y-2">
-          <p>
-            <span className="font-medium">Effective Cost</span> = (Price + Tax)
-            − max(0, AdjSalePrice×AdjProb − Fees − Shipping −
-            (AdjTimeHours×$∕hr) − Friction)
-          </p>
-        </div>
-      </Section>
+          <Section
+            title="Weights & Sensitivity"
+            subtitle="Tune how much each pillar matters"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <LabeledNumber
+                label="Weight: Financial"
+                value={wFinancial}
+                onChange={setWFinancial}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+              <LabeledNumber
+                label="Weight: Utility/Joy"
+                value={wUtility}
+                onChange={setWUtility}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+              <LabeledNumber
+                label="Weight: Risk/Logistics"
+                value={wRisk}
+                onChange={setWRisk}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </div>
+            <p
+              className={`text-xs mt-2 ${
+                Math.abs(sumW - 1) < 0.01 ? "text-slate-500" : "text-red-600"
+              }`}
+            >
+              Weights should sum to ~1. Current: {sumW.toFixed(2)}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                Score now:{" "}
+                <span className="font-semibold">{sensitivity.current}</span>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                If no resale:{" "}
+                <span className="font-semibold">{sensitivity.noResale}</span>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                If best-case resale:{" "}
+                <span className="font-semibold">{sensitivity.bestResale}</span>
+              </div>
+              {simulateWait && (
+                <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                  If you wait {monthsToWait} mo @ −{targetDiscountPct}%:{" "}
+                  <span className="font-semibold">{sensitivity.waitSale}</span>
+                </div>
+              )}
+            </div>
+          </Section>
 
-      {/* Footer */}
-      <footer className="pt-2 text-xs text-slate-500 flex items-center justify-between">
-        <div>
-          Made by <span className="font-medium">you</span>. Weights & formulas
-          are editable — trust your judgment.
+          <Section
+            title="History"
+            subtitle="Your saved purchase ideas (stored in this browser)"
+          >
+            {entries.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No entries yet. Tune something above and hit{" "}
+                <span className="font-medium">Save entry</span>.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {entries.map((e) => (
+                  <div
+                    key={e.id}
+                    className={`flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-xl p-3 ${
+                      activeId === e.id
+                        ? "border-slate-900"
+                        : "border-slate-200"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{e.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {new Date(e.createdAt).toLocaleString()} •{" "}
+                        {e.outputs.verdict} • {e.outputs.decisionScore}/100 •
+                        Eff: {currency(e.outputs.effectiveCost)}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="btn-ghost"
+                        onClick={() => loadEntry(e)}
+                      >
+                        Load
+                      </button>
+                      <button
+                        className="btn-ghost"
+                        onClick={() => {
+                          setItemName(e.inputs.itemName);
+                          setActiveId(e.id);
+                        }}
+                      >
+                        Rename via Item
+                      </button>
+                      <button
+                        className="btn-danger"
+                        onClick={() => deleteEntry(e.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title="Explain the Math"
+            subtitle="Transparent formula sketch"
+          >
+            <div className="text-sm space-y-2">
+              <p>
+                <span className="font-medium">Effective Cost</span> = (Price +
+                Tax) − max(0, AdjSalePrice×AdjProb − Fees − Shipping −
+                (AdjTimeHours×$∕hr) − Friction)
+              </p>
+            </div>
+          </Section>
+
+          <footer className="pt-2 text-xs text-slate-500 flex items-center justify-between">
+            <div>
+              Made by <span className="font-medium">you</span>. Weights &
+              formulas are editable — trust your judgment.
+            </div>
+            <a className="underline" href="#top">
+              Back to top
+            </a>
+          </footer>
         </div>
-        <a className="underline" href="#top">
-          Back to top
-        </a>
-      </footer>
+
+        {/* RIGHT: sticky summary */}
+        <div className="lg:col-span-4">
+          <DecisionSummary
+            verdictLabel={verdict.label}
+            decisionScore={decisionScore}
+            stickerCost={stickerCost}
+            effectiveCost={effectiveCost}
+            resaleOffset={resaleOffset}
+            costPerUse={costPerUse}
+            sensitivity={sensitivity}
+            simulateWait={simulateWait}
+            monthsToWait={monthsToWait}
+            targetDiscountPct={targetDiscountPct}
+            budgetImpact={budgetImpact}
+            useFrequency={useFrequency}
+            longevity={longevity}
+            price={price}
+            taxFor={taxFor}
+            needLevel={needLevel}
+            joyScore={joyScore}
+            workRelated={workRelated}
+            resaleAggressive={resaleAggressive}
+            altAvailable={altAvailable}
+            returnPolicy={returnPolicy}
+            warranty={warranty}
+            spaceFit={spaceFit}
+            urgency={urgency}
+            keepOldItem={keepOldItem}
+            minimalismStrength={minimalismStrength}
+          />
+        </div>
+      </div>
     </div>
   );
 }
